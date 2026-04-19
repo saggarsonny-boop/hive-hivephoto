@@ -1,15 +1,15 @@
-import sharp from "sharp";
+import sharp from 'sharp'
 
 /**
- * Generate a thumbnail: max 800px on the longest side, WebP quality 80.
+ * Generate a thumbnail: max 800px wide, WebP quality 80, orientation-corrected.
  */
-export async function generateThumbnail(imageBuffer: Buffer): Promise<Buffer> {
-  return sharp(imageBuffer)
-    .rotate() // Auto-rotate based on EXIF orientation
-    .resize(800, 800, {
-      fit: "inside",
+export async function generateThumbnail(buffer: Buffer): Promise<Buffer> {
+  return sharp(buffer)
+    .rotate() // Auto-rotate from EXIF orientation
+    .resize(800, null, {
+      fit: 'inside',
       withoutEnlargement: true,
     })
     .webp({ quality: 80 })
-    .toBuffer();
+    .toBuffer()
 }

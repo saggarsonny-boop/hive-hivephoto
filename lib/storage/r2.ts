@@ -3,24 +3,24 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { env } from "@/lib/env";
+} from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { env } from '@/lib/env'
 
-let _client: S3Client | null = null;
+let _client: S3Client | null = null
 
 function getClient(): S3Client {
   if (!_client) {
     _client = new S3Client({
-      region: "auto",
+      region: 'auto',
       endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
       credentials: {
         accessKeyId: env.R2_ACCESS_KEY_ID,
         secretAccessKey: env.R2_SECRET_ACCESS_KEY,
       },
-    });
+    })
   }
-  return _client;
+  return _client
 }
 
 export async function getPresignedPutUrl(
@@ -33,8 +33,8 @@ export async function getPresignedPutUrl(
     Bucket: bucket,
     Key: key,
     ContentType: mimeType,
-  });
-  return getSignedUrl(getClient(), command, { expiresIn });
+  })
+  return getSignedUrl(getClient(), command, { expiresIn })
 }
 
 export async function getSignedGetUrl(
@@ -42,29 +42,29 @@ export async function getSignedGetUrl(
   key: string,
   expiresIn = 3600
 ): Promise<string> {
-  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
-  return getSignedUrl(getClient(), command, { expiresIn });
+  const command = new GetObjectCommand({ Bucket: bucket, Key: key })
+  return getSignedUrl(getClient(), command, { expiresIn })
 }
 
 export async function objectExists(bucket: string, key: string): Promise<boolean> {
   try {
-    await getClient().send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
-    return true;
+    await getClient().send(new HeadObjectCommand({ Bucket: bucket, Key: key }))
+    return true
   } catch {
-    return false;
+    return false
   }
 }
 
 export async function getObjectBuffer(bucket: string, key: string): Promise<Buffer> {
   const response = await getClient().send(
     new GetObjectCommand({ Bucket: bucket, Key: key })
-  );
-  if (!response.Body) throw new Error("Empty body from R2");
-  const chunks: Uint8Array[] = [];
+  )
+  if (!response.Body) throw new Error('Empty body from R2')
+  const chunks: Uint8Array[] = []
   for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
-    chunks.push(chunk);
+    chunks.push(chunk)
   }
-  return Buffer.concat(chunks);
+  return Buffer.concat(chunks)
 }
 
 export async function putObject(
@@ -80,5 +80,5 @@ export async function putObject(
       Body: body,
       ContentType: contentType,
     })
-  );
+  )
 }

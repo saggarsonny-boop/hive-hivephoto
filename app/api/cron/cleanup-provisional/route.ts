@@ -1,14 +1,10 @@
-import { NextResponse } from "next/server";
-import { requireCron } from "@/lib/auth/guards";
-import { runCleanupProvisional } from "@/lib/cron/cleanup-provisional";
+import { NextResponse } from 'next/server'
+import { runCleanupProvisional } from '@/lib/cron/cleanup-provisional'
 
-export async function GET(request: Request): Promise<Response> {
-  try {
-    requireCron(request);
-    const result = await runCleanupProvisional();
-    return NextResponse.json({ ok: true, ...result });
-  } catch (err) {
-    if (err instanceof Response) return err;
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+export async function GET(req: Request) {
+  if (req.headers.get('x-cron-secret') !== process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 401 })
   }
+  const result = await runCleanupProvisional()
+  return NextResponse.json(result)
 }

@@ -1,174 +1,158 @@
-"use client";
+'use client'
+import { useRef, useState } from 'react'
+import { UpgradePrompt } from '@/components/shared/UpgradePrompt'
+import type { PresignResponse, CompleteUploadResponse } from '@/lib/types/pipeline'
 
-import { useState, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import UploadProgress, { type FileUploadState } from "./UploadProgress";
-import type { PresignResponse, CompleteUploadResponse } from "@/lib/types/pipeline";
-
-const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/gif", "image/avif", "image/tiff"];
-const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
-
-async function computeSha256(file: File): Promise<string> {
-  const buffer = await file.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+interface QueueItem {
+  id: string
+  filename: string
+  status: 'pending' | 'uploading' | 'done' | 'error' | 'duplicate'
+  progress: number
+  error?: string
+  photoId?: string
+  isNearDuplicate?: boolean
 }
 
-export default function UploadZone() {
-  const [fileStates, setFileStates] = useState<FileUploadState[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
+interface Props {
+  queue: QueueItem[]
+  setQueue: React.Dispatch<React.SetStateAction<QueueItem[]>>
+}
 
-  const updateFile = (index: number, update: Partial<FileUploadState>) => {
-    setFileStates((prev) => prev.map((f, i) => (i === index ? { ...f, ...update } : f)));
-  };
+async function sha256Hex(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer()
+  const hash = await crypto.subtle.digest('SHA-256', arrayBuffer)
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
 
-  const processFiles = useCallback(async (files: File[]) => {
-    const valid = files.filter((f) => {
-      if (!ACCEPTED.includes(f.type)) return false;
-      if (f.size > MAX_SIZE) return false;
-      return true;
-    });
+export function UploadZone({ queue, setQueue }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [dragging, setDragging] = useState(false)
+  const [storageLimitHit, setStorageLimitHit] = useState(false)
 
-    if (!valid.length) return;
+  function updateItem(id: string, update: Partial<QueueItem>) {
+    setQueue((prev) => prev.map((item) => (item.id === id ? { ...item, ...update } : item)))
+  }
 
-    const startIndex = fileStates.length;
-    const initialStates: FileUploadState[] = valid.map((f) => ({
-      name: f.name,
+  async function processFile(file: File) {
+    const queueId = `${Date.now()}-${file.name}`
+    const newItem: QueueItem = {
+      id: queueId,
+      filename: file.name,
+      status: 'pending',
       progress: 0,
-      status: "hashing",
-    }));
-    setFileStates((prev) => [...prev, ...initialStates]);
+    }
+    setQueue((prev) => [...prev, newItem])
 
-    for (let i = 0; i < valid.length; i++) {
-      const file = valid[i];
-      const idx = startIndex + i;
+    try {
+      updateItem(queueId, { status: 'uploading', progress: 10 })
 
-      try {
-        // Step 1: Hash
-        updateFile(idx, { status: "hashing", progress: 10 });
-        const sha256 = await computeSha256(file);
+      // Compute SHA-256
+      const sha256Hash = await sha256Hex(file)
+      updateItem(queueId, { progress: 20 })
 
-        // Step 2: Presign
-        updateFile(idx, { status: "presigning", progress: 25 });
-        const presignRes = await fetch("/api/ingest/presign", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            filename: file.name,
-            mimeType: file.type || "image/jpeg",
-            fileSize: file.size,
-            sha256,
-          }),
-        });
+      // Presign
+      const presignRes = await fetch('/api/ingest/presign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: file.name,
+          mimeType: file.type || 'image/jpeg',
+          fileSize: file.size,
+          sha256Hash,
+        }),
+      })
 
-        if (!presignRes.ok) throw new Error("Presign failed");
-        const presign = (await presignRes.json()) as PresignResponse;
-
-        if (presign.isDuplicate) {
-          updateFile(idx, { status: "duplicate", progress: 100 });
-          continue;
-        }
-
-        if (!presign.uploadUrl || !presign.photoId || !presign.storageKey) {
-          throw new Error("Invalid presign response");
-        }
-
-        // Step 3: Upload directly to R2
-        updateFile(idx, { status: "uploading", progress: 40 });
-        const uploadRes = await fetch(presign.uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": file.type || "image/jpeg" },
-          body: file,
-        });
-
-        if (!uploadRes.ok) throw new Error("Upload to R2 failed");
-        updateFile(idx, { progress: 85 });
-
-        // Step 4: Complete
-        updateFile(idx, { status: "completing", progress: 90 });
-        const completeRes = await fetch("/api/ingest/complete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            photoId: presign.photoId,
-            storageKey: presign.storageKey,
-          }),
-        });
-
-        if (!completeRes.ok) throw new Error("Complete failed");
-        await completeRes.json() as CompleteUploadResponse;
-
-        updateFile(idx, { status: "done", progress: 100 });
-      } catch (err) {
-        updateFile(idx, {
-          status: "error",
-          progress: 0,
-          error: err instanceof Error ? err.message : "Upload failed",
-        });
+      if (presignRes.status === 402) {
+        setStorageLimitHit(true)
+        updateItem(queueId, { status: 'error', error: 'Storage limit reached' })
+        return
       }
+
+      const presign = (await presignRes.json()) as PresignResponse
+
+      if (presign.isDuplicate) {
+        updateItem(queueId, { status: 'duplicate', progress: 100, photoId: presign.existingId })
+        return
+      }
+
+      if (!presign.uploadUrl || !presign.photoId || !presign.storageKey) {
+        throw new Error('Invalid presign response')
+      }
+
+      updateItem(queueId, { progress: 30 })
+
+      // PUT to R2
+      const putRes = await fetch(presign.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'image/jpeg' },
+        body: file,
+      })
+
+      if (!putRes.ok) throw new Error(`R2 upload failed: ${putRes.status}`)
+      updateItem(queueId, { progress: 70 })
+
+      // Complete
+      const completeRes = await fetch('/api/ingest/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoId: presign.photoId, storageKey: presign.storageKey }),
+      })
+      const complete = (await completeRes.json()) as CompleteUploadResponse
+
+      updateItem(queueId, {
+        status: 'done',
+        progress: 100,
+        photoId: complete.photoId,
+        isNearDuplicate: complete.isNearDuplicate,
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      updateItem(queueId, { status: 'error', error: msg })
     }
+  }
 
-    // Navigate to gallery after all done
-    const allDone = valid.every((_, i) => {
-      const s = fileStates[startIndex + i]?.status;
-      return s === "done" || s === "duplicate" || s === "error";
-    });
-    if (allDone) {
-      setTimeout(() => router.push("/"), 1500);
+  async function handleFiles(files: FileList | null) {
+    if (!files) return
+    const images = Array.from(files).filter((f) => f.type.startsWith('image/'))
+    for (const file of images) {
+      await processFile(file)
     }
-  }, [fileStates, router]);
-
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const files = Array.from(e.dataTransfer.files);
-    processFiles(files);
-  };
-
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    processFiles(files);
-    e.target.value = "";
-  };
+  }
 
   return (
-    <div>
+    <>
+      {storageLimitHit && (
+        <UpgradePrompt
+          message="You've reached your storage limit."
+          onDismiss={() => setStorageLimitHit(false)}
+        />
+      )}
       <div
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-        onDragLeave={() => setIsDragging(false)}
-        onDrop={onDrop}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files) }}
         onClick={() => inputRef.current?.click()}
-        className={`relative border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all ${
-          isDragging
-            ? "border-hive-gold bg-hive-gold/5"
-            : "border-hive-border hover:border-hive-gold/50 bg-hive-surface hover:bg-hive-gold/5"
+        className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors ${
+          dragging
+            ? 'border-amber-400 bg-amber-400/5'
+            : 'border-zinc-700 hover:border-zinc-500 bg-zinc-900/50'
         }`}
       >
+        <div className="text-4xl mb-3">📷</div>
+        <p className="text-white font-semibold mb-1">Drop photos here</p>
+        <p className="text-zinc-400 text-sm">or click to select files</p>
+        <p className="text-zinc-600 text-xs mt-2">JPEG, PNG, HEIC, WebP, GIF supported</p>
         <input
           ref={inputRef}
           type="file"
+          accept="image/*"
           multiple
-          accept={ACCEPTED.join(",")}
-          onChange={onFileChange}
-          className="sr-only"
+          className="hidden"
+          onChange={(e) => handleFiles(e.target.files)}
         />
-
-        <div className="text-5xl mb-4">📷</div>
-        <p className="text-white font-medium text-lg">
-          {isDragging ? "Drop photos here" : "Drag photos here or click to browse"}
-        </p>
-        <p className="text-sm text-gray-400 mt-2">
-          JPEG, PNG, WebP, HEIC, AVIF · Max 50 MB per file
-        </p>
-        <p className="text-xs text-gray-500 mt-1">
-          Photos are hashed client-side — exact duplicates are skipped automatically
-        </p>
       </div>
-
-      <UploadProgress files={fileStates} />
-    </div>
-  );
+    </>
+  )
 }

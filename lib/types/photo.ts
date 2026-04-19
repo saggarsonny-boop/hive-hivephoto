@@ -1,52 +1,66 @@
 export interface Photo {
-  id: string;
-  userId: string;
-  storageKey: string | null;
-  thumbKey: string | null;
-  sha256: string | null;
-  phash: string | null;
-  filename: string | null;
-  mimeType: string | null;
-  fileSize: number | null;
-  width: number | null;
-  height: number | null;
-  takenAt: string; // ISO string
-  gpsLat: number | null;
-  gpsLon: number | null;
-  aiDescription: string | null;
-  aiTags: string[] | null;
-  aiScene: string | null;
-  aiLocation: string | null;
-  duplicateReviewStatus: string;
-  uploadStatus: string;
-  processingStatus: string;
-  processingError: string | null;
-  createdAt: string;
-  updatedAt: string;
-  thumbUrl?: string; // computed at read time
+  id: string
+  userId: string
+  originalKey: string | null
+  thumbKey: string | null
+  thumbUrl: string | null
+  format: string | null
+  fileSizeBytes: number | null
+  width: number | null
+  height: number | null
+  isProvisional: boolean
+  uploadStatus: 'awaiting_upload' | 'uploaded' | 'abandoned'
+  takenAt: string // ISO
+  takenAtConfidence: 'exif' | 'filename' | 'upload'
+  uploadedAt: string
+  gpsLat: number | null
+  gpsLng: number | null
+  locationName: string | null
+  cameraMake: string | null
+  cameraModel: string | null
+  aiTitle: string | null
+  userTitle: string | null
+  aiDescription: string | null
+  objects: string[]
+  scenes: string[]
+  emotions: string[]
+  actions: string[]
+  colors: string[]
+  dominantColor: string | null
+  sha256Hash: string
+  pHash: string | null
+  isNearDuplicate: boolean
+  nearDuplicateOf: string | null
+  duplicateReviewStatus: 'pending' | 'kept_new' | 'kept_original' | 'kept_both'
+  processingStatus: 'pending' | 'processing' | 'done' | 'error'
+  processingError: string | null
+  processingAttempts: number
+  deletedAt: string | null
 }
 
 export interface PhotoFace {
-  id: string;
-  photoId: string;
-  personId: string | null;
-  bbox: { x: number; y: number; w: number; h: number };
-  confidence: number | null;
-  embeddingKey: string | null;
-  createdAt: string;
+  id: string
+  photoId: string
+  personId: string | null
+  boundingBox: { x: number; y: number; w: number; h: number }
+  emotion: string | null
+  isLookingAtCamera: boolean | null
+  estimatedAgeGroup: 'child' | 'teen' | 'adult' | 'elderly' | null
+  confidence: number | null
+  createdAt: string
 }
 
 export interface Person {
-  id: string;
-  userId: string;
-  name: string | null;
-  avatarThumbKey: string | null;
-  avatarThumbUrl?: string;
-  createdAt: string;
-  updatedAt: string;
-  faceCount?: number;
+  id: string
+  userId: string
+  name: string
+  coverPhotoId: string | null
+  photoCount: number
+  createdAt: string
+  updatedAt: string
+  coverThumbUrl?: string
 }
 
-export type UploadStatus = "awaiting_upload" | "uploaded" | "failed";
-export type ProcessingStatus = "pending" | "processing" | "done" | "error";
-export type DuplicateReviewStatus = "none" | "flagged" | "kept_new" | "kept_original" | "kept_both";
+export type UploadStatus = 'awaiting_upload' | 'uploaded' | 'abandoned'
+export type ProcessingStatus = 'pending' | 'processing' | 'done' | 'error'
+export type DuplicateReviewStatus = 'pending' | 'kept_new' | 'kept_original' | 'kept_both'

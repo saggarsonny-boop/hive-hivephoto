@@ -1,125 +1,60 @@
-"use client";
-
-import { SignedIn, SignedOut, RedirectToSignIn } from "@clerk/nextjs";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import Shell from "@/components/layout/Shell";
-import PhotoGrid from "@/components/gallery/PhotoGrid";
-import type { Person, Photo } from "@/lib/types/photo";
+'use client'
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import Image from 'next/image'
+import Link from 'next/link'
+import { Nav } from '@/components/layout/Nav'
+import { PhotoCard } from '@/components/gallery/PhotoCard'
+import type { Person, Photo } from '@/lib/types/photo'
 
 export default function PersonPage() {
-  const params = useParams<{ id: string }>();
-  const router = useRouter();
-  const [person, setPerson] = useState<Person | null>(null);
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState("");
+  const { id } = useParams<{ id: string }>()
+  const [person, setPerson] = useState<Person | null>(null)
+  const [photoIds, setPhotoIds] = useState<string[]>([])
+  const [photos, setPhotos] = useState<Photo[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`/api/people/${params.id}`)
+    if (!id) return
+    fetch(`/api/people/${id}`)
       .then((r) => r.json())
-      .then((data: { person: Person; photos: Photo[] }) => {
-        setPerson(data.person);
-        setPhotos(data.photos);
-        setName(data.person.name ?? "");
+      .then(async (data: { person: Person; photoIds: string[] }) => {
+        setPerson(data.person)
+        setPhotoIds(data.photoIds ?? [])
+        // Fetch photos
+        const photoPromises = (data.photoIds ?? []).slice(0, 50).map((pid) =>
+          fetch(`/api/photos/${pid}`).then((r) => r.json() as Promise<Photo>)
+        )
+        const fetched = await Promise.all(photoPromises)
+        setPhotos(fetched.filter(Boolean))
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [params.id]);
-
-  const saveName = async () => {
-    if (!name.trim()) return;
-    await fetch(`/api/people/${params.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim() }),
-    });
-    setPerson((p) => (p ? { ...p, name: name.trim() } : p));
-    setEditing(false);
-  };
-
-  const deletePerson = async () => {
-    if (!confirm("Delete this person? Their face labels will be removed.")) return;
-    await fetch(`/api/people/${params.id}`, { method: "DELETE" });
-    router.push("/people");
-  };
-
-  if (loading) {
-    return (
-      <SignedIn>
-        <Shell>
-          <div className="px-4 py-6 text-gray-400">Loading…</div>
-        </Shell>
-      </SignedIn>
-    );
-  }
+      .finally(() => setLoading(false))
+  }, [id])
 
   return (
-    <>
-      <SignedIn>
-        <Shell>
-          <div className="px-4 py-6">
-            <div className="flex items-center gap-4 mb-6">
-              {person?.avatarThumbUrl && (
-                <img
-                  src={person.avatarThumbUrl}
-                  alt={person.name ?? "Person"}
-                  className="w-16 h-16 rounded-full object-cover"
-                />
-              )}
-              <div>
-                {editing ? (
-                  <div className="flex gap-2">
-                    <input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="bg-hive-surface border border-hive-border rounded px-3 py-1 text-white text-lg"
-                      onKeyDown={(e) => e.key === "Enter" && saveName()}
-                      autoFocus
-                    />
-                    <button
-                      onClick={saveName}
-                      className="px-3 py-1 bg-hive-gold text-black rounded text-sm font-medium"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditing(false)}
-                      className="px-3 py-1 bg-hive-border text-white rounded text-sm"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <h1
-                    className="text-2xl font-semibold text-white cursor-pointer hover:text-hive-gold"
-                    onClick={() => setEditing(true)}
-                  >
-                    {person?.name ?? "Unnamed person"}
-                  </h1>
-                )}
-                <p className="text-sm text-gray-400 mt-1">
-                  {person?.faceCount ?? photos.length} photo
-                  {(person?.faceCount ?? photos.length) !== 1 ? "s" : ""}
-                </p>
-              </div>
-              <div className="ml-auto">
-                <button
-                  onClick={deletePerson}
-                  className="text-sm text-red-400 hover:text-red-300"
-                >
-                  Delete person
-                </button>
-              </div>
-            </div>
-            <PhotoGrid photos={photos} />
+    <div className="min-h-screen bg-zinc-950 text-white">
+      <Nav />
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/people" className="text-zinc-400 hover:text-white text-sm">
+            ← People
+          </Link>
+          {person && (
+            <h1 className="text-2xl font-bold">{person.name}</h1>
+          )}
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
           </div>
-        </Shell>
-      </SignedIn>
-      <SignedOut>
-        <RedirectToSignIn />
-      </SignedOut>
-    </>
-  );
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+            {photos.map((photo) => (
+              <PhotoCard key={photo.id} photo={photo} />
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  )
 }

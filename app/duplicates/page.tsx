@@ -1,116 +1,108 @@
-"use client";
+'use client'
+import { useEffect, useState } from 'react'
+import Image from 'next/image'
+import { Nav } from '@/components/layout/Nav'
+import { EmptyState } from '@/components/shared/EmptyState'
+import type { Photo } from '@/lib/types/photo'
 
-import { SignedIn, SignedOut, RedirectToSignIn } from "@clerk/nextjs";
-import { useEffect, useState } from "react";
-import Shell from "@/components/layout/Shell";
-import EmptyState from "@/components/shared/EmptyState";
-import type { Photo } from "@/lib/types/photo";
-import Link from "next/link";
+interface DupePair {
+  newPhoto: Photo
+  originalPhoto: Photo | null
+}
 
 export default function DuplicatesPage() {
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchDuplicates = async () => {
-    const res = await fetch("/api/duplicates");
-    const data = (await res.json()) as { photos: Photo[] };
-    setPhotos(data.photos);
-    setLoading(false);
-  };
+  const [dupes, setDupes] = useState<Photo[]>([])
+  const [loading, setLoading] = useState(true)
+  const [actioning, setActioning] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchDuplicates();
-  }, []);
+    fetch('/api/duplicates')
+      .then((r) => r.json())
+      .then((data: { photos: Photo[] }) => setDupes(data.photos ?? []))
+      .finally(() => setLoading(false))
+  }, [])
 
-  const handleAction = async (
-    photoId: string,
-    action: "keep-new" | "keep-original" | "keep-both"
-  ) => {
-    await fetch(`/api/duplicates/${photoId}/${action}`, { method: "POST" });
-    setPhotos((prev) => prev.filter((p) => p.id !== photoId));
-  };
+  async function action(photoId: string, type: 'keep-new' | 'keep-original' | 'keep-both') {
+    setActioning(photoId)
+    await fetch(`/api/duplicates/${photoId}/${type}`, { method: 'POST' })
+    setDupes((prev) => prev.filter((p) => p.id !== photoId))
+    setActioning(null)
+  }
 
   return (
-    <>
-      <SignedIn>
-        <Shell>
-          <div className="px-4 py-6">
-            <h1 className="text-2xl font-semibold text-white mb-2">Possible Duplicates</h1>
-            <p className="text-sm text-gray-400 mb-6">
-              These photos look very similar. Choose what to keep.
-            </p>
+    <div className="min-h-screen bg-zinc-950 text-white">
+      <Nav />
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-2">Duplicate Review</h1>
+        <p className="text-zinc-400 text-sm mb-8">
+          These photos are very similar to existing ones. Choose which to keep.
+        </p>
 
-            {loading && <p className="text-gray-400">Loading…</p>}
+        {loading && (
+          <div className="flex justify-center py-16">
+            <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
 
-            {!loading && photos.length === 0 && (
-              <EmptyState
-                title="No duplicates found"
-                description="Your library looks clean. Any near-duplicate photos will appear here for review."
-              />
-            )}
+        {!loading && dupes.length === 0 && (
+          <EmptyState title="No duplicates" description="No duplicate photos to review." />
+        )}
 
-            <div className="space-y-4">
-              {photos.map((photo) => (
-                <div
-                  key={photo.id}
-                  className="bg-hive-surface border border-hive-border rounded-xl p-4 flex gap-4 items-start"
-                >
-                  <Link href={`/photo/${photo.id}`}>
-                    {photo.thumbUrl ? (
-                      <img
-                        src={photo.thumbUrl}
-                        alt={photo.filename ?? "Photo"}
-                        className="w-24 h-24 object-cover rounded-lg flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-24 h-24 bg-hive-border rounded-lg flex-shrink-0 flex items-center justify-center text-gray-500 text-xs">
-                        No thumb
-                      </div>
-                    )}
-                  </Link>
-
-                  <div className="flex-1">
-                    <p className="text-white font-medium">{photo.filename ?? photo.id}</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {new Date(photo.takenAt).toLocaleDateString()} ·{" "}
-                      {photo.fileSize ? `${(photo.fileSize / 1024 / 1024).toFixed(1)} MB` : ""}
-                    </p>
-                    {photo.aiDescription && (
-                      <p className="text-sm text-gray-300 mt-1 line-clamp-2">
-                        {photo.aiDescription}
-                      </p>
-                    )}
+        {!loading && dupes.map((photo) => (
+          <div key={photo.id} className="bg-zinc-900 rounded-xl p-6 mb-6 border border-zinc-800">
+            <div className="grid grid-cols-2 gap-6 mb-4">
+              <div>
+                <p className="text-xs text-zinc-400 mb-2 uppercase tracking-wide">New upload</p>
+                {photo.thumbUrl && (
+                  <div className="relative aspect-video bg-zinc-800 rounded-lg overflow-hidden">
+                    <Image src={photo.thumbUrl} alt="New" fill className="object-cover" />
                   </div>
-
-                  <div className="flex flex-col gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => handleAction(photo.id, "keep-new")}
-                      className="px-3 py-1.5 text-sm bg-hive-gold text-black rounded font-medium hover:bg-hive-amber"
-                    >
-                      Keep new
-                    </button>
-                    <button
-                      onClick={() => handleAction(photo.id, "keep-original")}
-                      className="px-3 py-1.5 text-sm bg-hive-border text-white rounded hover:bg-neutral-600"
-                    >
-                      Keep original
-                    </button>
-                    <button
-                      onClick={() => handleAction(photo.id, "keep-both")}
-                      className="px-3 py-1.5 text-sm border border-hive-border text-gray-300 rounded hover:border-gray-400"
-                    >
-                      Keep both
-                    </button>
+                )}
+                <p className="text-xs text-zinc-500 mt-2">
+                  {photo.fileSizeBytes ? `${Math.round(photo.fileSizeBytes / 1024)}KB` : ''}
+                  {' · '}
+                  {photo.width}×{photo.height}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-zinc-400 mb-2 uppercase tracking-wide">Existing photo</p>
+                {photo.nearDuplicateOf ? (
+                  <div className="bg-zinc-800 rounded-lg aspect-video flex items-center justify-center">
+                    <p className="text-zinc-500 text-sm">Existing photo</p>
                   </div>
-                </div>
-              ))}
+                ) : (
+                  <div className="bg-zinc-800 rounded-lg aspect-video flex items-center justify-center">
+                    <p className="text-zinc-500 text-sm">Loading...</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => action(photo.id, 'keep-new')}
+                disabled={actioning === photo.id}
+                className="flex-1 bg-amber-400 hover:bg-amber-300 text-zinc-950 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                Keep New
+              </button>
+              <button
+                onClick={() => action(photo.id, 'keep-original')}
+                disabled={actioning === photo.id}
+                className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                Keep Original
+              </button>
+              <button
+                onClick={() => action(photo.id, 'keep-both')}
+                disabled={actioning === photo.id}
+                className="flex-1 border border-zinc-600 hover:border-zinc-400 text-zinc-300 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                Keep Both
+              </button>
             </div>
           </div>
-        </Shell>
-      </SignedIn>
-      <SignedOut>
-        <RedirectToSignIn />
-      </SignedOut>
-    </>
-  );
+        ))}
+      </main>
+    </div>
+  )
 }

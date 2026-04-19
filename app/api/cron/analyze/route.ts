@@ -1,15 +1,10 @@
-import { NextResponse } from "next/server";
-import { requireCron } from "@/lib/auth/guards";
-import { runAnalyzeCron } from "@/lib/cron/analyze";
+import { NextResponse } from 'next/server'
+import { runAnalyzeCron } from '@/lib/cron/analyze'
 
-export async function GET(request: Request): Promise<Response> {
-  try {
-    requireCron(request);
-    const result = await runAnalyzeCron();
-    return NextResponse.json({ ok: true, ...result });
-  } catch (err) {
-    if (err instanceof Response) return err;
-    console.error("[cron/analyze]", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+export async function GET(req: Request) {
+  if (req.headers.get('x-cron-secret') !== process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 401 })
   }
+  const result = await runAnalyzeCron()
+  return NextResponse.json(result)
 }

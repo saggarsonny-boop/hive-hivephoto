@@ -1,11 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { env } from "@/lib/env";
+import Anthropic from '@anthropic-ai/sdk'
+import { env } from '@/lib/env'
 
-let _client: Anthropic | null = null;
+let _client: Anthropic | null = null
 
 export function getAnthropicClient(): Anthropic {
   if (!_client) {
-    _client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    _client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
   }
-  return _client;
+  return _client
 }

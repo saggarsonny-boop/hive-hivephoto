@@ -1,84 +1,112 @@
-import ExifReader from "exifreader";
-import type { ExtractedMetadata } from "@/lib/types/pipeline";
+import ExifReader from 'exifreader'
+import sharp from 'sharp'
+import type { ExtractedMetadata } from '@/lib/types/pipeline'
 
 /**
  * Extract image metadata from a buffer.
- * takenAt fallback chain: EXIF DateTimeOriginal -> filename date -> now()
+ * Width/height are authoritative from sharp.
+ * takenAt fallback chain: exif DateTimeOriginal → filename date pattern → new Date()
  */
 export async function extractMetadata(
   buffer: Buffer,
   filename?: string
 ): Promise<ExtractedMetadata> {
-  let tags: ExifReader.Tags = {} as ExifReader.Tags;
+  // Get authoritative dimensions from sharp
+  const sharpMeta = await sharp(buffer).metadata()
+  const width = sharpMeta.width ?? 0
+  const height = sharpMeta.height ?? 0
+  const orientation = sharpMeta.orientation ?? null
+
+  let tags: ExifReader.Tags = {} as ExifReader.Tags
   try {
-    tags = ExifReader.load(buffer);
+    tags = ExifReader.load(buffer)
   } catch {
-    // Non-fatal: proceed with defaults
+    // Non-fatal
   }
 
-  // Dimensions
-  const width = (tags["Image Width"]?.value as number) ?? (tags["PixelXDimension"]?.value as number) ?? null;
-  const height = (tags["Image Height"]?.value as number) ?? (tags["PixelYDimension"]?.value as number) ?? null;
-
   // Timestamp
-  let takenAt: Date | null = null;
-  const exifDate = tags["DateTimeOriginal"]?.description as string | undefined;
+  let takenAt: Date | null = null
+  let takenAtConfidence: 'exif' | 'filename' | 'upload' = 'upload'
+
+  const exifDate = tags['DateTimeOriginal']?.description as string | undefined
   if (exifDate) {
-    // EXIF format: "2023:06:15 14:30:00"
-    const normalized = exifDate.replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3");
-    const parsed = new Date(normalized);
-    if (!isNaN(parsed.getTime())) takenAt = parsed;
+    const normalized = exifDate.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3')
+    const parsed = new Date(normalized)
+    if (!isNaN(parsed.getTime())) {
+      takenAt = parsed
+      takenAtConfidence = 'exif'
+    }
   }
 
   if (!takenAt && filename) {
-    // Try to extract date from filename like: IMG_20230615_143000.jpg, 2023-06-15 ...
-    const match = filename.match(/(\d{4})[-_](\d{2})[-_](\d{2})/);
+    const match = filename.match(/(\d{4})[-_](\d{2})[-_](\d{2})/)
     if (match) {
-      const parsed = new Date(`${match[1]}-${match[2]}-${match[3]}`);
-      if (!isNaN(parsed.getTime())) takenAt = parsed;
+      const parsed = new Date(`${match[1]}-${match[2]}-${match[3]}`)
+      if (!isNaN(parsed.getTime())) {
+        takenAt = parsed
+        takenAtConfidence = 'filename'
+      }
     }
   }
 
-  if (!takenAt) takenAt = new Date();
+  if (!takenAt) takenAt = new Date()
 
   // GPS
-  let gpsLat: number | null = null;
-  let gpsLon: number | null = null;
+  let gpsLat: number | null = null
+  let gpsLng: number | null = null
 
-  const latTag = tags["GPSLatitude"];
-  const lonTag = tags["GPSLongitude"];
-  const latRef = tags["GPSLatitudeRef"]?.description as string | undefined;
-  const lonRef = tags["GPSLongitudeRef"]?.description as string | undefined;
+  try {
+    const latTag = tags['GPSLatitude']
+    const lngTag = tags['GPSLongitude']
+    const latRef = tags['GPSLatitudeRef']?.description as string | undefined
+    const lngRef = tags['GPSLongitudeRef']?.description as string | undefined
 
-  if (latTag && lonTag) {
-    try {
-      gpsLat = parseGpsCoordinate(latTag.value as unknown as [number, number, number][], latRef);
-      gpsLon = parseGpsCoordinate(lonTag.value as unknown as [number, number, number][], lonRef);
-    } catch {
-      gpsLat = null;
-      gpsLon = null;
+    if (latTag && lngTag) {
+      gpsLat = parseGpsCoord(latTag.value, latRef)
+      gpsLng = parseGpsCoord(lngTag.value, lngRef)
     }
+  } catch {
+    gpsLat = null
+    gpsLng = null
   }
 
-  return { width, height, takenAt, gpsLat, gpsLon };
+  // Camera
+  const cameraMake = (tags['Make']?.description as string) ?? null
+  const cameraModel = (tags['Model']?.description as string) ?? null
+
+  return {
+    width,
+    height,
+    takenAt,
+    takenAtConfidence,
+    gpsLat,
+    gpsLng,
+    cameraMake,
+    cameraModel,
+    orientation,
+  }
 }
 
-function parseGpsCoordinate(
-  value: [number, number, number][] | number,
-  ref?: string
-): number {
-  let decimal: number;
+type GpsValue = Array<[number, number]> | number | unknown
+
+function parseGpsCoord(value: GpsValue, ref?: string): number {
+  let decimal: number
 
   if (Array.isArray(value)) {
-    // value is array of [numerator, denominator] pairs
-    const deg = Array.isArray(value[0]) ? value[0][0] / value[0][1] : (value[0] as unknown as number);
-    const min = Array.isArray(value[1]) ? value[1][0] / value[1][1] : (value[1] as unknown as number);
-    const sec = Array.isArray(value[2]) ? value[2][0] / value[2][1] : (value[2] as unknown as number);
-    decimal = deg + min / 60 + sec / 3600;
+    const toDecimal = (pair: unknown): number => {
+      if (Array.isArray(pair) && pair.length === 2) {
+        return (pair[0] as number) / (pair[1] as number)
+      }
+      return pair as number
+    }
+    const deg = toDecimal(value[0])
+    const min = toDecimal(value[1])
+    const sec = toDecimal(value[2])
+    decimal = deg + min / 60 + sec / 3600
   } else {
-    decimal = value as unknown as number;
+    decimal = value as number
   }
 
-  if (ref === "S" || ref === "W") decimal = -decimal;
-  return decimal;
+  if (ref === 'S' || ref === 'W') decimal = -decimal
+  return decimal
 }

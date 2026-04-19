@@ -1,73 +1,76 @@
-"use client";
-
-import { SignedIn, SignedOut, RedirectToSignIn, useUser, useClerk } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
-import Shell from "@/components/layout/Shell";
+'use client'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { Nav } from '@/components/layout/Nav'
+import { StorageBar } from '@/components/pricing/StorageBar'
+import { Footer } from '@/components/layout/Footer'
+import type { PricingTier } from '@/lib/pricing/tiers'
 
 export default function AccountPage() {
-  const { user } = useUser();
-  const { signOut } = useClerk();
-  const router = useRouter();
+  const [tier, setTier] = useState<PricingTier | null>(null)
+  const [storageUsed, setStorageUsed] = useState<bigint>(0n)
+  const [loading, setLoading] = useState(true)
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.push("/");
-  };
+  useEffect(() => {
+    fetch('/api/subscription')
+      .then((r) => r.json())
+      .then((data: { tier: PricingTier; storageUsed: string }) => {
+        setTier(data.tier)
+        setStorageUsed(BigInt(data.storageUsed ?? '0'))
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const tierLabel = tier?.displayName ?? 'Free'
+  const isFounding = tier?.isFounding
 
   return (
-    <>
-      <SignedIn>
-        <Shell>
-          <div className="px-4 py-6 max-w-lg">
-            <h1 className="text-2xl font-semibold text-white mb-6">Account</h1>
+    <div className="min-h-screen bg-zinc-950 text-white">
+      <Nav />
+      <main className="max-w-2xl mx-auto px-4 py-12">
+        <h1 className="text-2xl font-bold mb-8">Account</h1>
 
-            <div className="bg-hive-surface border border-hive-border rounded-xl p-6 space-y-4">
-              <div className="flex items-center gap-4">
-                {user?.imageUrl && (
-                  <img
-                    src={user.imageUrl}
-                    alt={user.fullName ?? "User"}
-                    className="w-14 h-14 rounded-full object-cover"
-                  />
+        <div className="bg-zinc-900 rounded-xl p-6 mb-6 border border-zinc-800">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-sm text-zinc-400 mb-1">Current plan</p>
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-bold">{tierLabel}</span>
+                {isFounding && (
+                  <span className="bg-amber-400 text-zinc-950 text-xs font-bold px-2 py-0.5 rounded-full">
+                    Founding
+                  </span>
                 )}
-                <div>
-                  <p className="text-white font-medium">{user?.fullName ?? "—"}</p>
-                  <p className="text-sm text-gray-400">
-                    {user?.primaryEmailAddress?.emailAddress ?? ""}
-                  </p>
-                </div>
               </div>
-
-              <hr className="border-hive-border" />
-
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">
-                  Your library
-                </p>
-                <p className="text-sm text-gray-300">
-                  Photos are stored privately and only accessible to you.
-                </p>
-              </div>
-
-              <hr className="border-hive-border" />
-
-              <button
-                onClick={handleSignOut}
-                className="w-full py-2.5 bg-red-900/40 hover:bg-red-900/60 border border-red-800/50 text-red-300 rounded-lg text-sm font-medium transition-colors"
-              >
-                Sign out
-              </button>
             </div>
-
-            <p className="text-xs text-gray-600 mt-6 text-center">
-              No ads. No investors. No agenda.
-            </p>
+            <Link
+              href="/pricing"
+              className="bg-amber-400 hover:bg-amber-300 text-zinc-950 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+            >
+              Upgrade
+            </Link>
           </div>
-        </Shell>
-      </SignedIn>
-      <SignedOut>
-        <RedirectToSignIn />
-      </SignedOut>
-    </>
-  );
+          <StorageBar />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Link
+            href="/account/billing"
+            className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition-colors"
+          >
+            <p className="font-semibold mb-1">Billing</p>
+            <p className="text-zinc-400 text-sm">Manage subscription & invoices</p>
+          </Link>
+          <Link
+            href="/account/storage"
+            className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition-colors"
+          >
+            <p className="font-semibold mb-1">Storage</p>
+            <p className="text-zinc-400 text-sm">View storage usage & events</p>
+          </Link>
+        </div>
+      </main>
+      <Footer />
+    </div>
+  )
 }

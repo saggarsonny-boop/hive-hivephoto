@@ -1,21 +1,11 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+import type { NextConfig } from 'next'
+const config: NextConfig = {
   images: {
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "*.r2.cloudflarestorage.com",
-      },
-      {
-        protocol: "https",
-        hostname: "*.hive.baby",
-      },
+      { protocol: 'https', hostname: '*.r2.cloudflarestorage.com' },
+      { protocol: 'https', hostname: '*.cloudflare.com' },
     ],
   },
-  experimental: {
-    serverComponentsExternalPackages: ["sharp", "exifreader"],
-  },
-};
-
-export default nextConfig;
+  serverExternalPackages: ['sharp', 'exifreader'],
+}
+export default config

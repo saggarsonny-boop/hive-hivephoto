@@ -1,48 +1,38 @@
 export interface PresignRequest {
-  filename: string;
-  mimeType: string;
-  fileSize: number;
-  sha256: string;
+  filename: string
+  mimeType: string
+  fileSize: number
+  sha256Hash: string
 }
 
 export interface PresignResponse {
-  isDuplicate: boolean;
-  existingId?: string;
-  photoId?: string;
-  uploadUrl?: string;
-  storageKey?: string;
+  isDuplicate: boolean
+  existingId?: string
+  photoId?: string
+  uploadUrl?: string
+  storageKey?: string
 }
 
 export interface CompleteUploadRequest {
-  photoId: string;
-  storageKey: string;
+  photoId: string
+  storageKey: string
 }
 
 export interface CompleteUploadResponse {
-  success: boolean;
-  photoId: string;
-  isDuplicateCandidate?: boolean;
-  duplicateOfId?: string;
+  success: boolean
+  photoId: string
+  isNearDuplicate?: boolean
+  nearDuplicateOfId?: string
 }
 
 export interface ExtractedMetadata {
-  width: number | null;
-  height: number | null;
-  takenAt: Date;
-  gpsLat: number | null;
-  gpsLon: number | null;
-}
-
-export interface AiFaceDetection {
-  bbox: { x: number; y: number; w: number; h: number };
-  estimated_age?: number;
-  gender_hint?: string;
-}
-
-export interface AiAnalysisResult {
-  description: string;
-  tags: string[];
-  scene: string;
-  location: string | null;
-  faces: AiFaceDetection[];
+  width: number
+  height: number
+  takenAt: Date
+  takenAtConfidence: 'exif' | 'filename' | 'upload'
+  gpsLat: number | null
+  gpsLng: number | null
+  cameraMake: string | null
+  cameraModel: string | null
+  orientation: number | null
 }

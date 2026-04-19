@@ -1,97 +1,51 @@
-"use client";
-
-import { SignedIn, SignedOut, RedirectToSignIn } from "@clerk/nextjs";
-import { useState, useCallback } from "react";
-import Shell from "@/components/layout/Shell";
-import SearchBar from "@/components/search/SearchBar";
-import PhotoGrid from "@/components/gallery/PhotoGrid";
-import type { SearchFilters } from "@/lib/types/search";
-import type { Photo } from "@/lib/types/photo";
+'use client'
+import { useState } from 'react'
+import { Nav } from '@/components/layout/Nav'
+import { SearchBar } from '@/components/search/SearchBar'
+import { SearchFiltersDisplay } from '@/components/search/SearchFiltersDisplay'
+import { GalleryGrid } from '@/components/gallery/GalleryGrid'
+import { EmptyState } from '@/components/shared/EmptyState'
+import type { Photo } from '@/lib/types/photo'
+import type { SearchFilters } from '@/lib/types/search'
 
 export default function SearchPage() {
-  const [results, setResults] = useState<Photo[] | null>(null);
-  const [filters, setFilters] = useState<SearchFilters | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('')
+  const [photos, setPhotos] = useState<Photo[]>([])
+  const [filters, setFilters] = useState<SearchFilters>({})
+  const [loading, setLoading] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
 
-  const handleSearch = useCallback(async (q: string) => {
-    if (!q.trim()) {
-      setResults(null);
-      setFilters(null);
-      return;
-    }
-    setQuery(q);
-    setLoading(true);
+  async function handleSearch(q: string) {
+    setQuery(q)
+    setLoading(true)
+    setHasSearched(true)
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-      const data = (await res.json()) as { photos: Photo[]; filters: SearchFilters };
-      setResults(data.photos);
-      setFilters(data.filters);
-    } catch {
-      setResults([]);
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`)
+      const data = (await res.json()) as { photos: Photo[]; filters: SearchFilters }
+      setPhotos(data.photos ?? [])
+      setFilters(data.filters ?? {})
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
+  }
 
   return (
-    <>
-      <SignedIn>
-        <Shell>
-          <div className="px-4 py-6">
-            <h1 className="text-2xl font-semibold text-white mb-6">Search</h1>
-            <SearchBar onSearch={handleSearch} loading={loading} />
-
-            {filters && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {filters.scene && (
-                  <span className="px-2 py-1 text-xs rounded bg-hive-border text-gray-300">
-                    Scene: {filters.scene}
-                  </span>
-                )}
-                {filters.location && (
-                  <span className="px-2 py-1 text-xs rounded bg-hive-border text-gray-300">
-                    Location: {filters.location}
-                  </span>
-                )}
-                {filters.personName && (
-                  <span className="px-2 py-1 text-xs rounded bg-hive-border text-gray-300">
-                    Person: {filters.personName}
-                  </span>
-                )}
-                {filters.tags?.map((tag) => (
-                  <span
-                    key={tag}
-                    className="px-2 py-1 text-xs rounded bg-hive-gold/20 text-hive-gold"
-                  >
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {results === null && !loading && (
-              <p className="text-gray-400 mt-8 text-center">
-                Type anything — &ldquo;beach photos from last summer&rdquo;, &ldquo;photos of
-                Sarah&rdquo;, &ldquo;birthday 2022&rdquo;
-              </p>
-            )}
-
-            {results !== null && !loading && (
-              <div className="mt-6">
-                <p className="text-sm text-gray-400 mb-4">
-                  {results.length} result{results.length !== 1 ? "s" : ""} for &ldquo;{query}
-                  &rdquo;
-                </p>
-                <PhotoGrid photos={results} />
-              </div>
-            )}
+    <div className="min-h-screen bg-zinc-950 text-white">
+      <Nav />
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-6">Search Photos</h1>
+        <SearchBar onSearch={handleSearch} loading={loading} />
+        {hasSearched && <SearchFiltersDisplay filters={filters} />}
+        {loading && (
+          <div className="flex justify-center py-16">
+            <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
           </div>
-        </Shell>
-      </SignedIn>
-      <SignedOut>
-        <RedirectToSignIn />
-      </SignedOut>
-    </>
-  );
+        )}
+        {!loading && hasSearched && photos.length === 0 && (
+          <EmptyState title="No results" description={`No photos matched "${query}"`} />
+        )}
+        {!loading && photos.length > 0 && <GalleryGrid photos={photos} />}
+      </main>
+    </div>
+  )
 }

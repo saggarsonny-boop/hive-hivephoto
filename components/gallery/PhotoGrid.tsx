@@ -1,49 +1,22 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import PhotoCard from "./PhotoCard";
-import EmptyState from "@/components/shared/EmptyState";
-import type { Photo } from "@/lib/types/photo";
+'use client'
+import { PhotoCard } from './PhotoCard'
+import { EmptyState } from '@/components/shared/EmptyState'
+import type { Photo } from '@/lib/types/photo'
 
 interface Props {
-  photos?: Photo[]; // If provided, use these (search results). Otherwise fetch.
+  photos: Photo[]
+  loading?: boolean
 }
 
-export default function PhotoGrid({ photos: externalPhotos }: Props) {
-  const [photos, setPhotos] = useState<Photo[]>(externalPhotos ?? []);
-  const [loading, setLoading] = useState(!externalPhotos);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (externalPhotos !== undefined) {
-      setPhotos(externalPhotos);
-      return;
-    }
-    setLoading(true);
-    fetch("/api/photos?limit=200")
-      .then((r) => r.json())
-      .then((data: { photos: Photo[] }) => {
-        setPhotos(data.photos);
-      })
-      .catch(() => setError("Failed to load photos"))
-      .finally(() => setLoading(false));
-  }, [externalPhotos]);
-
+export function PhotoGrid({ photos, loading }: Props) {
   if (loading) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
         {Array.from({ length: 24 }).map((_, i) => (
-          <div
-            key={i}
-            className="aspect-square rounded-lg bg-hive-surface animate-pulse border border-hive-border"
-          />
+          <div key={i} className="aspect-square rounded-lg bg-zinc-900 animate-pulse border border-zinc-800" />
         ))}
       </div>
-    );
-  }
-
-  if (error) {
-    return <p className="text-red-400 text-sm">{error}</p>;
+    )
   }
 
   if (!photos.length) {
@@ -51,9 +24,9 @@ export default function PhotoGrid({ photos: externalPhotos }: Props) {
       <EmptyState
         title="No photos yet"
         description="Upload your first photo to get started."
-        action={{ label: "Upload photos", href: "/upload" }}
+        action={{ label: 'Upload photos', href: '/upload' }}
       />
-    );
+    )
   }
 
   return (
@@ -62,5 +35,7 @@ export default function PhotoGrid({ photos: externalPhotos }: Props) {
         <PhotoCard key={photo.id} photo={photo} />
       ))}
     </div>
-  );
+  )
 }
+
+export default PhotoGrid
