@@ -1,0 +1,7 @@
+{
+  "crons": [
+    { "path": "/api/cron/analyze", "schedule": "*/2 * * * *" },
+    { "path": "/api/cron/cleanup-provisional", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/cleanup", "schedule": "0 3 * * *" }
+  ]
+}
