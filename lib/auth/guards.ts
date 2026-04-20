@@ -1,8 +1,6 @@
-import { auth } from '@clerk/nextjs/server'
+// Auth stubbed — Clerk removed. Single shared space until proper auth is wired.
 export async function requireUser(): Promise<string> {
-  const { userId } = await auth()
-  if (!userId) throw new Response('Unauthorized', { status: 401 })
-  return userId
+  return 'guest'
 }
 
 export function requireCronSecret(req: Request): void {
