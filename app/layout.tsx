@@ -9,13 +9,15 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+  const body = (
+    <body className="min-h-screen antialiased">
+      {children}
+    </body>
+  )
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className="min-h-screen antialiased">
-          {children}
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en">
+      {clerkKey ? <ClerkProvider>{body}</ClerkProvider> : body}
+    </html>
   )
 }
