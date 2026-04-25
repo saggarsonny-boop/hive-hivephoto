@@ -16,11 +16,15 @@ const BLOCKED_PATTERNS = [
 ]
 
 export default function middleware(req: NextRequest) {
-  const pathname = req.nextUrl.pathname
-  for (const pattern of BLOCKED_PATTERNS) {
-    if (pattern.test(pathname)) {
-      return new NextResponse(null, { status: 404 })
+  try {
+    const pathname = req.nextUrl.pathname
+    for (const pattern of BLOCKED_PATTERNS) {
+      if (pattern.test(pathname)) {
+        return new NextResponse(null, { status: 404 })
+      }
     }
+  } catch {
+    // fail open — never let middleware crash the request
   }
   return NextResponse.next()
 }
