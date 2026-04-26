@@ -12,7 +12,7 @@ if (clerkKey && clerkKey.length > 10) {
     '/pricing',
     '/sign-in(.*)',
     '/sign-up(.*)',
-    '//_next/(.*)',
+    '/_next/(.*)',
     '/favicon.ico',
   ])
   handler = clerkMiddleware(async (auth: any, req: NextRequest) => {
@@ -26,7 +26,7 @@ export default handler
 
 export const config = {
   matcher: [
-    '/((?!.*\..*|_next).*)',
+    '/((?!.*\\..*|_next).*)',
     '/',
     '/(api|trpc)(.*)',
   ],
