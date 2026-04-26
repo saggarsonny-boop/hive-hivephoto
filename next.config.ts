@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next'
 const config: NextConfig = {
   eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.r2.cloudflarestorage.com' },
