@@ -1,34 +1,33 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const BLOCKED_PATTERNS = [
-  /\.env/i,
-  /\/administrator\//i,
-  /\/brevo\//i,
-  /\/\.git/i,
-  /\/wp-admin/i,
-  /\/wp-login/i,
-  /\/phpMyAdmin/i,
-  /\/phpmyadmin/i,
-  /\.php$/i,
-  /\/xmlrpc/i,
-  /\/config\./i,
-]
+const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 
-export default function middleware(req: NextRequest) {
-  try {
-    const pathname = req.nextUrl.pathname
-    for (const pattern of BLOCKED_PATTERNS) {
-      if (pattern.test(pathname)) {
-        return new NextResponse(null, { status: 404 })
-      }
-    }
-  } catch {
-    // fail open — never let middleware crash the request
-  }
-  return NextResponse.next()
+let handler: (req: NextRequest) => Response | NextResponse | Promise<Response | NextResponse>
+
+if (clerkKey && clerkKey.length > 10) {
+  const { clerkMiddleware, createRouteMatcher } = require('@clerk/nextjs/server')
+  const isPublic = createRouteMatcher([
+    '/',
+    '/pricing',
+    '/sign-in(.*)',
+    '/sign-up(.*)',
+    '//_next/(.*)',
+    '/favicon.ico',
+  ])
+  handler = clerkMiddleware(async (auth: any, req: NextRequest) => {
+    if (!isPublic(req)) await auth.protect()
+  })
+} else {
+  handler = (_req: NextRequest) => NextResponse.next()
 }
 
+export default handler
+
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!.*\..*|_next).*)',
+    '/',
+    '/(api|trpc)(.*)',
+  ],
 }
