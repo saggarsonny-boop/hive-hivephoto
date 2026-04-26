@@ -1,5 +1,5 @@
-function getEnv(key: string, fallback: string = ''): string {
-  return process.env[key] ?? fallback
+function getEnv(name: string, fallback: string = ''): string {
+  return process.env[name] ?? fallback
 }
 
 export const env = {
@@ -8,12 +8,12 @@ export const env = {
   R2_ACCOUNT_ID: getEnv('R2_ACCOUNT_ID'),
   R2_ACCESS_KEY_ID: getEnv('R2_ACCESS_KEY_ID'),
   R2_SECRET_ACCESS_KEY: getEnv('R2_SECRET_ACCESS_KEY'),
-  R2_BUCKET_ORIGINALS: getEnv('R2_BUCKET_ORIGINALS', 'hivephoto-originals'),
-  R2_BUCKET_THUMBS: getEnv('R2_BUCKET_THUMBS', 'hivephoto-thumbs'),
+  R2_BUCKET_ORIGINALS: getEnv('R2_BUCKET_ORIGINALS'),
+  R2_BUCKET_THUMBS: getEnv('R2_BUCKET_THUMBS'),
   R2_PUBLIC_THUMB_URL: getEnv('R2_PUBLIC_THUMB_URL'),
   DATABASE_URL: getEnv('DATABASE_URL'),
   ANTHROPIC_API_KEY: getEnv('ANTHROPIC_API_KEY'),
-  NEXT_PUBLIC_APP_URL: getEnv('NEXT_PUBLIC_APP_URL', 'https://hivephoto.hive.baby'),
+  NEXT_PUBLIC_APP_URL: getEnv('NEXT_PUBLIC_APP_URL'),
   CRON_SECRET: getEnv('CRON_SECRET'),
   STRIPE_SECRET_KEY: getEnv('STRIPE_SECRET_KEY'),
   STRIPE_WEBHOOK_SECRET: getEnv('STRIPE_WEBHOOK_SECRET'),
