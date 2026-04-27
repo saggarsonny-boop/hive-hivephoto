@@ -76,12 +76,12 @@ export async function countPhotosByUser(userId: string): Promise<number> {
 export async function updatePhotoAfterUpload(params: {
   id: string
   originalKey: string
-  thumbKey: string
-  thumbUrl: string
+  thumbKey: string | null
+  thumbUrl: string | null
   format: string
   fileSizeBytes: number
-  width: number
-  height: number
+  width: number | null
+  height: number | null
   takenAt: Date
   takenAtConfidence: 'exif' | 'filename' | 'upload'
   gpsLat: number | null

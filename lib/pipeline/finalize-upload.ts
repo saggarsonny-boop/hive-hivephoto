@@ -14,7 +14,7 @@ import {
   getStorageUsedBytes,
   trackStorageEvent,
 } from '@/lib/db/photos'
-import { thumbKey } from '@/lib/storage/keys'
+import { thumbKey, isRawExt } from '@/lib/storage/keys'
 import { env } from '@/lib/env'
 import type { CompleteUploadResponse } from '@/lib/types/pipeline'
 
@@ -29,16 +29,23 @@ export async function finalizeUpload(
   if (!exists) throw new Error(`Object not found in R2: ${storageKey}`)
 
   const buffer = await getObjectBuffer(env.R2_BUCKET_ORIGINALS, storageKey)
-  const metadata = await extractMetadata(buffer, filename)
-  const photoHash = await pHash(buffer)
-
-  const thumb = await generateThumbnail(buffer)
-  const tKey = thumbKey(userId, photoId)
-  await putObject(env.R2_BUCKET_THUMBS, tKey, thumb, 'image/webp')
-
-  const thumbUrl = `${env.R2_PUBLIC_THUMB_URL}/${tKey}`
   const extParts = storageKey.split('.')
   const format = extParts[extParts.length - 1] ?? 'jpg'
+  const isRaw = isRawExt(format)
+
+  const metadata = await extractMetadata(buffer, filename ?? storageKey.split('/').pop())
+
+  let tKey: string | null = null
+  let thumbUrl: string | null = null
+  let photoHash: string | null = null
+
+  if (!isRaw) {
+    const thumb = await generateThumbnail(buffer)
+    tKey = thumbKey(userId, photoId)
+    await putObject(env.R2_BUCKET_THUMBS, tKey, thumb, 'image/webp')
+    thumbUrl = `${env.R2_PUBLIC_THUMB_URL}/${tKey}`
+    photoHash = await pHash(buffer)
+  }
 
   await updatePhotoAfterUpload({
     id: photoId,
@@ -47,8 +54,8 @@ export async function finalizeUpload(
     thumbUrl,
     format,
     fileSizeBytes: buffer.length,
-    width: metadata.width,
-    height: metadata.height,
+    width: metadata.width || null,
+    height: metadata.height || null,
     takenAt: metadata.takenAt,
     takenAtConfidence: metadata.takenAtConfidence,
     gpsLat: metadata.gpsLat,
@@ -68,8 +75,8 @@ export async function finalizeUpload(
     storageAfter,
   })
 
-  // Near-duplicate check (only against same user, hamming <= 3)
-  const nearDupes = await findNearDuplicates(userId, photoHash)
+  // Near-duplicate check (only for non-RAW files with a pHash)
+  const nearDupes = photoHash ? await findNearDuplicates(userId, photoHash) : []
   const dupes = nearDupes.filter((p) => p.id !== photoId)
 
   if (dupes.length > 0) {

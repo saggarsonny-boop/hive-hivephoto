@@ -1,21 +1,27 @@
 import ExifReader from 'exifreader'
 import sharp from 'sharp'
+import { isRawExt } from '@/lib/storage/keys'
 import type { ExtractedMetadata } from '@/lib/types/pipeline'
 
-/**
- * Extract image metadata from a buffer.
- * Width/height are authoritative from sharp.
- * takenAt fallback chain: exif DateTimeOriginal → filename date pattern → new Date()
- */
 export async function extractMetadata(
   buffer: Buffer,
   filename?: string
 ): Promise<ExtractedMetadata> {
-  // Get authoritative dimensions from sharp
-  const sharpMeta = await sharp(buffer).metadata()
-  const width = sharpMeta.width ?? 0
-  const height = sharpMeta.height ?? 0
-  const orientation = sharpMeta.orientation ?? null
+  const ext = filename?.split('.').pop()?.toLowerCase() ?? ''
+  const isRaw = isRawExt(ext)
+
+  // For RAW files, skip sharp — use 0 for dimensions (unknown until decoded)
+  let width = 0, height = 0, orientation: number | null = null
+  if (!isRaw) {
+    try {
+      const sharpMeta = await sharp(buffer).metadata()
+      width = sharpMeta.width ?? 0
+      height = sharpMeta.height ?? 0
+      orientation = sharpMeta.orientation ?? null
+    } catch {
+      // Non-fatal — keep 0,0
+    }
+  }
 
   let tags: ExifReader.Tags = {} as ExifReader.Tags
   try {
