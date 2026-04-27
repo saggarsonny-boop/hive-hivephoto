@@ -9,7 +9,7 @@ export function StorageBar() {
   useEffect(() => {
     fetch('/api/storage/usage')
       .then((r) => r.json())
-      .then(setData)
+      .then((d) => { if (d?.usedBytes && d?.totalBytes) setData(d) })
       .catch(() => null)
   }, [])
 
