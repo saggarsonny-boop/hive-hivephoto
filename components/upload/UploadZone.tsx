@@ -3,7 +3,7 @@ import { useRef, useState } from 'react'
 import { UpgradePrompt } from '@/components/shared/UpgradePrompt'
 import type { PresignResponse, CompleteUploadResponse } from '@/lib/types/pipeline'
 
-const RAW_MIME_MAP: Record<string, string> = {
+const EXT_MIME_MAP: Record<string, string> = {
   nef: 'image/x-nikon-nef', nrw: 'image/x-nikon-nrw', arw: 'image/x-sony-arw',
   srf: 'image/x-sony-srf', sr2: 'image/x-sony-sr2', cr2: 'image/x-canon-cr2',
   cr3: 'image/x-canon-cr3', crw: 'image/x-canon-crw', raf: 'image/x-fujifilm-raf',
@@ -13,20 +13,23 @@ const RAW_MIME_MAP: Record<string, string> = {
   iiq: 'image/x-phase-one-iiq', cap: 'image/x-phase-one-cap', erf: 'image/x-epson-erf',
   mef: 'image/x-mamiya-mef', mos: 'image/x-leaf-mos', mrw: 'image/x-minolta-mrw',
   x3f: 'image/x-sigma-x3f', heic: 'image/heic', heif: 'image/heif',
+  uds: 'application/x-universal-document-sealed',
+  udr: 'application/x-universal-document-revisable',
+  udz: 'application/x-universal-document-bundle',
 }
 
-const RAW_EXTS = new Set(Object.keys(RAW_MIME_MAP))
+const ACCEPTED_EXTS = new Set(Object.keys(EXT_MIME_MAP))
 
 function resolveFileMime(file: File): string {
   if (file.type && file.type !== 'application/octet-stream') return file.type
   const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
-  return RAW_MIME_MAP[ext] ?? file.type ?? 'application/octet-stream'
+  return EXT_MIME_MAP[ext] ?? file.type ?? 'application/octet-stream'
 }
 
 function isAcceptedFile(file: File): boolean {
   if (file.type.startsWith('image/')) return true
   const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
-  return RAW_EXTS.has(ext)
+  return ACCEPTED_EXTS.has(ext)
 }
 
 interface QueueItem {
@@ -174,11 +177,11 @@ export function UploadZone({ queue, setQueue }: Props) {
         <div className="text-4xl mb-3">📷</div>
         <p className="text-white font-semibold mb-1">Drop photos here</p>
         <p className="text-zinc-400 text-sm">or click to select files</p>
-        <p className="text-zinc-600 text-xs mt-2">JPEG, PNG, HEIC, WebP, GIF, RAW (NEF, ARW, CR2, CR3, DNG, RAF, RW2 and more)</p>
+        <p className="text-zinc-600 text-xs mt-2">Photos (JPEG, PNG, HEIC, WebP, RAW), Universal Documents (.uds, .udr, .udz)</p>
         <input
           ref={inputRef}
           type="file"
-          accept="image/*,.nef,.nrw,.arw,.srf,.sr2,.cr2,.cr3,.crw,.raf,.rw2,.orf,.pef,.ptx,.dng,.raw,.rwl,.3fr,.fff,.iiq,.cap,.erf,.mef,.mos,.mrw,.x3f"
+          accept="image/*,.nef,.nrw,.arw,.srf,.sr2,.cr2,.cr3,.crw,.raf,.rw2,.orf,.pef,.ptx,.dng,.raw,.rwl,.3fr,.fff,.iiq,.cap,.erf,.mef,.mos,.mrw,.x3f,.uds,.udr,.udz"
           multiple
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}

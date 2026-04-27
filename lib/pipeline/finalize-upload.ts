@@ -14,7 +14,7 @@ import {
   getStorageUsedBytes,
   trackStorageEvent,
 } from '@/lib/db/photos'
-import { thumbKey, isRawExt } from '@/lib/storage/keys'
+import { thumbKey, isRawExt, isDocumentExt } from '@/lib/storage/keys'
 import { env } from '@/lib/env'
 import type { CompleteUploadResponse } from '@/lib/types/pipeline'
 
@@ -32,6 +32,7 @@ export async function finalizeUpload(
   const extParts = storageKey.split('.')
   const format = extParts[extParts.length - 1] ?? 'jpg'
   const isRaw = isRawExt(format)
+  const isDoc = isDocumentExt(format)
 
   const metadata = await extractMetadata(buffer, filename ?? storageKey.split('/').pop())
 
@@ -39,7 +40,7 @@ export async function finalizeUpload(
   let thumbUrl: string | null = null
   let photoHash: string | null = null
 
-  if (!isRaw) {
+  if (!isRaw && !isDoc) {
     const thumb = await generateThumbnail(buffer)
     tKey = thumbKey(userId, photoId)
     await putObject(env.R2_BUCKET_THUMBS, tKey, thumb, 'image/webp')

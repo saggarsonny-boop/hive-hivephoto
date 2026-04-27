@@ -62,3 +62,9 @@ export function isRawMime(mimeType: string): boolean {
   const ext = MIME_TO_EXT[mimeType]
   return ext ? RAW_EXTENSIONS.has(ext) : false
 }
+
+const DOCUMENT_EXTENSIONS = new Set(['uds', 'udr', 'udz'])
+
+export function isDocumentExt(ext: string): boolean {
+  return DOCUMENT_EXTENSIONS.has(ext.toLowerCase().replace(/^\./, ''))
+}
