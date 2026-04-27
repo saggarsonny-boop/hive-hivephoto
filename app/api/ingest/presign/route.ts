@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/lib/auth/guards'
 import { presignUpload } from '@/lib/pipeline/presign'
+import { env } from '@/lib/env'
 import type { PresignRequest } from '@/lib/types/pipeline'
 
 export async function POST(req: Request) {
+  if (!env.R2_ACCOUNT_ID || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.R2_BUCKET_ORIGINALS) {
+    return NextResponse.json({ error: 'Storage not configured', code: 'R2_MISSING' }, { status: 503 })
+  }
+
   try {
     const userId = await requireUser()
     const body = (await req.json()) as PresignRequest

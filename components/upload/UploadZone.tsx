@@ -70,6 +70,11 @@ export function UploadZone({ queue, setQueue }: Props) {
         return
       }
 
+      if (presignRes.status === 503) {
+        updateItem(queueId, { status: 'error', error: 'Upload unavailable — R2 storage not configured. Check Vercel env vars: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_ORIGINALS.' })
+        return
+      }
+
       const presign = (await presignRes.json()) as PresignResponse
 
       if (presign.isDuplicate) {
